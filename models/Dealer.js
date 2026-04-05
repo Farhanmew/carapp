@@ -44,19 +44,14 @@ const dealerSchema = new mongoose.Schema({
   },
 });
 
-dealerSchema.pre("save", async function (next) {
+dealerSchema.pre("save", async function () {
   // Skip hashing if the password was not changed.
   if (!this.isModified("password")) {
-    return next();
+    return;
   }
 
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 dealerSchema.methods.comparePassword = async function (plainPassword) {
