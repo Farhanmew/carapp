@@ -42,14 +42,14 @@ export default function Navbar() {
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-sm">
                 <Image
                   src={newLogo}
-                  alt="valuedrivee logo"
+                  alt="valuedrive logo"
                   className="h-full w-full object-contain"
                   priority
                   sizes="48px"
                 />
               </div>
               <div className="min-w-0">
-                <p className="text-lg font-extrabold tracking-tight text-slate-900">valuedrivee</p>
+                <p className="text-lg font-extrabold tracking-tight text-slate-900">valuedrive</p>
                 <p className="text-xs text-[var(--color-text-soft)]">Marketplace starter</p>
               </div>
             </Link>
