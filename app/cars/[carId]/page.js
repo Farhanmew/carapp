@@ -44,7 +44,7 @@ function getCarDetails(car) {
 function getDealerInfo(car) {
   return {
     name: car.dealerName || "Dealer not added",
-    email: car.dealerEmail || "sales@carapp.com",
+    email: car.dealerEmail || "sales@valuedrive.com",
     phone: car.dealerPhone || "+1 (555) 010-2020",
     location: car.location || "Location not added",
   };

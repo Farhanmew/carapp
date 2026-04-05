@@ -9,8 +9,8 @@ const inter = Inter({
 
 export const metadata = {
   title: {
-    default: "CarApp",
-    template: "%s | CarApp",
+    default: "valuedrive",
+    template: "%s | valuedrive",
   },
   description: "A simple car marketplace starter built with Next.js, Tailwind CSS, and MongoDB.",
 };
