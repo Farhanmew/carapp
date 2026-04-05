@@ -5,7 +5,8 @@ const variantClasses = {
     "bg-[var(--color-brand)] text-white shadow-sm hover:-translate-y-0.5 hover:bg-[var(--color-brand-dark)]",
   secondary:
     "border border-[var(--color-line-strong)] bg-white/90 text-slate-800 backdrop-blur-sm hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white",
-  ghost: "bg-white/45 text-slate-700 backdrop-blur-sm hover:bg-white/70",
+  ghost:
+    "border border-[var(--color-line-strong)] bg-transparent text-slate-800 backdrop-blur-sm hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white/60",
 };
 
 const sizeClasses = {
