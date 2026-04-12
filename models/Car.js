@@ -85,6 +85,12 @@ const carSchema = new mongoose.Schema({
     default: [],
   },
 
+  // Keep the matching Cloudinary public ids so remote assets can be cleaned up later.
+  imagePublicIds: {
+    type: [String],
+    default: [],
+  },
+
   // Link the car to the dealer who created the listing.
   dealerId: {
     type: mongoose.Schema.Types.ObjectId,

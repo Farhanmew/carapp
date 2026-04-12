@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
+import { deleteCloudinaryAssets } from "@/lib/cloudinary";
 import connectToDatabase from "@/lib/mongodb";
 import { requireAdminAuth } from "@/lib/adminMiddleware";
 import Car from "@/models/Car";
@@ -64,14 +65,23 @@ export async function DELETE(request, { params }) {
     }
 
     // Remove the dealer's cars and related enquiries to keep the data clean.
-    const dealerCars = await Car.find({ dealerId: dealer._id }).select("_id").lean();
+    const dealerCars = await Car.find({ dealerId: dealer._id }).select("_id imagePublicIds").lean();
     const dealerCarIds = dealerCars.map((car) => car._id.toString());
+    const dealerCarImagePublicIds = dealerCars.flatMap((car) =>
+      Array.isArray(car.imagePublicIds) ? car.imagePublicIds.filter(Boolean) : []
+    );
 
     await Dealer.findByIdAndDelete(dealer._id);
     await Car.deleteMany({ dealerId: dealer._id });
 
     if (dealerCarIds.length > 0) {
       await Enquiry.deleteMany({ carId: { $in: dealerCarIds } });
+    }
+
+    if (dealerCarImagePublicIds.length > 0) {
+      deleteCloudinaryAssets(dealerCarImagePublicIds).catch((cloudinaryError) => {
+        console.error("Cloudinary cleanup after dealer delete failed:", cloudinaryError);
+      });
     }
 
     return NextResponse.json({

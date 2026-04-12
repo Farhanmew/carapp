@@ -18,6 +18,7 @@ const emptyCarForm = {
   transmission: "",
   description: "",
   images: [],
+  imagePublicIds: [],
 };
 
 const emptyAuthForm = {
@@ -60,6 +61,9 @@ function getCarFormFromCar(car) {
     transmission: car.transmission || "",
     description: car.description || "",
     images: Array.isArray(car.images) ? car.images.filter(Boolean) : [],
+    imagePublicIds: Array.isArray(car.imagePublicIds)
+      ? car.imagePublicIds.map((publicId) => (typeof publicId === "string" ? publicId : ""))
+      : [],
   };
 }
 
@@ -138,7 +142,7 @@ function UploadedImagesField({ images, uploadingImages, onUpload, onRemoveImage 
                 <img src={imageUrl} alt={`Uploaded car image ${index + 1}`} className="h-full w-full object-cover" />
                 <button
                   type="button"
-                  onClick={() => onRemoveImage(imageUrl)}
+                  onClick={() => onRemoveImage(index)}
                   aria-label={`Remove image ${index + 1}`}
                   className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/75 text-white transition hover:bg-slate-950"
                 >
@@ -517,9 +521,12 @@ export default function DealerDashboardContent() {
         return;
       }
 
+      const uploadedAssets = Array.isArray(result.assets) ? result.assets : [];
+
       setCarForm((currentForm) => ({
         ...currentForm,
-        images: [...currentForm.images, ...(result.urls || [])].slice(0, 8),
+        images: [...currentForm.images, ...uploadedAssets.map((asset) => asset.url)].slice(0, 8),
+        imagePublicIds: [...currentForm.imagePublicIds, ...uploadedAssets.map((asset) => asset.publicId)].slice(0, 8),
       }));
       showFeedback("success", result.message || "Images uploaded successfully.");
     } catch (error) {
@@ -531,10 +538,11 @@ export default function DealerDashboardContent() {
     }
   }
 
-  function handleRemoveImage(imageUrl) {
+  function handleRemoveImage(indexToRemove) {
     setCarForm((currentForm) => ({
       ...currentForm,
-      images: currentForm.images.filter((savedImageUrl) => savedImageUrl !== imageUrl),
+      images: currentForm.images.filter((_, index) => index !== indexToRemove),
+      imagePublicIds: currentForm.imagePublicIds.filter((_, index) => index !== indexToRemove),
     }));
   }
 
@@ -663,6 +671,7 @@ export default function DealerDashboardContent() {
           transmission: carForm.transmission,
           description: carForm.description,
           images: carForm.images,
+          imagePublicIds: carForm.imagePublicIds,
         }),
       });
 

@@ -1,30 +1,12 @@
-import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
 import { MAX_CAR_IMAGES } from "@/lib/carUtils";
+import { uploadImageBuffer } from "@/lib/cloudinary";
 import { requireDealerAuth } from "@/lib/dealerMiddleware";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = new Map([
-  ["image/jpeg", ".jpg"],
-  ["image/png", ".png"],
-  ["image/webp", ".webp"],
-  ["image/gif", ".gif"],
-]);
-
-function getSafeExtension(file) {
-  const typeExtension = ALLOWED_IMAGE_TYPES.get(file.type);
-
-  if (typeExtension) {
-    return typeExtension;
-  }
-
-  const originalExtension = path.extname(file.name || "").toLowerCase();
-  return [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(originalExtension) ? originalExtension : "";
-}
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export async function POST(request) {
   try {
@@ -57,10 +39,7 @@ export async function POST(request) {
       );
     }
 
-    const uploadDirectory = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadDirectory, { recursive: true });
-
-    const uploadedUrls = [];
+    const uploadedAssets = [];
 
     for (const file of files) {
       if (!(file instanceof File)) {
@@ -73,9 +52,7 @@ export async function POST(request) {
         );
       }
 
-      const safeExtension = getSafeExtension(file);
-
-      if (!safeExtension) {
+      if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
         return NextResponse.json(
           {
             success: false,
@@ -95,18 +72,19 @@ export async function POST(request) {
         );
       }
 
-      const fileName = `${Date.now()}-${randomUUID()}${safeExtension === ".jpeg" ? ".jpg" : safeExtension}`;
-      const filePath = path.join(uploadDirectory, fileName);
-      const fileBuffer = Buffer.from(await file.arrayBuffer());
+      const uploadResult = await uploadImageBuffer(Buffer.from(await file.arrayBuffer()));
 
-      await writeFile(filePath, fileBuffer);
-      uploadedUrls.push(`/uploads/${fileName}`);
+      uploadedAssets.push({
+        url: uploadResult.secure_url,
+        publicId: uploadResult.public_id,
+      });
     }
 
     return NextResponse.json({
       success: true,
       message: "Images uploaded successfully.",
-      urls: uploadedUrls,
+      assets: uploadedAssets,
+      urls: uploadedAssets.map((asset) => asset.url),
     });
   } catch (error) {
     console.error("POST /api/uploads error:", error);
@@ -114,7 +92,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: false,
-        message: "Something went wrong while uploading the images.",
+        message: error.message || "Something went wrong while uploading the images.",
       },
       { status: 500 }
     );

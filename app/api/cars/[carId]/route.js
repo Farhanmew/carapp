@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/mongodb";
 import { buildValidatedCarData } from "@/lib/carUtils";
+import { deleteCloudinaryAssets } from "@/lib/cloudinary";
 import { requireDealerAuth } from "@/lib/dealerMiddleware";
 import Car from "@/models/Car";
 import Enquiry from "@/models/Enquiry";
@@ -69,19 +70,12 @@ export async function PATCH(request, { params }) {
 
     await connectToDatabase();
 
-    const updatedCar = await Car.findOneAndUpdate(
-      {
-        _id: resolvedParams.carId,
-        dealerId: dealer._id,
-      },
-      validationResult.data,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const existingCar = await Car.findOne({
+      _id: resolvedParams.carId,
+      dealerId: dealer._id,
+    });
 
-    if (!updatedCar) {
+    if (!existingCar) {
       return NextResponse.json(
         {
           success: false,
@@ -91,10 +85,24 @@ export async function PATCH(request, { params }) {
       );
     }
 
+    const previousPublicIds = Array.isArray(existingCar.imagePublicIds) ? existingCar.imagePublicIds.filter(Boolean) : [];
+
+    Object.assign(existingCar, validationResult.data);
+    await existingCar.save();
+
+    const currentPublicIds = Array.isArray(existingCar.imagePublicIds) ? existingCar.imagePublicIds.filter(Boolean) : [];
+    const removedPublicIds = previousPublicIds.filter((publicId) => !currentPublicIds.includes(publicId));
+
+    if (removedPublicIds.length > 0) {
+      deleteCloudinaryAssets(removedPublicIds).catch((cloudinaryError) => {
+        console.error("Cloudinary cleanup after car update failed:", cloudinaryError);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: "Car updated successfully.",
-      car: formatCarResponse(updatedCar),
+      car: formatCarResponse(existingCar),
     });
   } catch (error) {
     console.error("PATCH /api/cars/[carId] error:", error);
@@ -152,6 +160,12 @@ export async function DELETE(request, { params }) {
     }
 
     await Enquiry.deleteMany({ carId: resolvedParams.carId });
+
+    if (Array.isArray(deletedCar.imagePublicIds) && deletedCar.imagePublicIds.length > 0) {
+      deleteCloudinaryAssets(deletedCar.imagePublicIds).catch((cloudinaryError) => {
+        console.error("Cloudinary cleanup after car delete failed:", cloudinaryError);
+      });
+    }
 
     return NextResponse.json({
       success: true,
