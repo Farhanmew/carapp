@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { sampleCars } from "@/data/sampleCars";
 import connectToDatabase from "@/lib/mongodb";
+import { buildValidatedCarData, escapeRegexValue } from "@/lib/carUtils";
 import { requireDealerAuth } from "@/lib/dealerMiddleware";
+import { loadPublicCars } from "@/lib/publicCars";
 import Car from "@/models/Car";
+
+export const dynamic = "force-dynamic";
 
 function serializeCars(cars) {
   return cars.map((car) => ({
@@ -18,16 +21,14 @@ function formatCarResponse(car) {
     ...car.toObject(),
     _id: car._id.toString(),
     dealerId: car.dealerId?.toString ? car.dealerId.toString() : car.dealerId,
-    createdAt: car.createdAt?.toISOString(),
+    createdAt: car.createdAt?.toISOString ? car.createdAt.toISOString() : car.createdAt,
   };
 }
 
-function escapeRegexValue(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function getCarFilters(searchParams) {
+  const search = searchParams.get("search")?.trim() || "";
   const brand = searchParams.get("brand")?.trim() || "";
+  const fuelType = searchParams.get("fuelType")?.trim() || "";
   const priceValue = searchParams.get("price")?.trim() || "";
   const price = priceValue ? Number(priceValue) : null;
   const mine = searchParams.get("mine") === "true";
@@ -40,83 +41,45 @@ function getCarFilters(searchParams) {
 
   return {
     filters: {
+      search,
       brand,
+      fuelType,
       price,
       mine,
     },
   };
 }
 
-function filterSampleCars(cars, filters) {
-  return cars.filter((car) => {
-    const carBrand = car.brand || car.make || "";
-    const matchesBrand = filters.brand
-      ? carBrand.toLowerCase() === filters.brand.toLowerCase()
-      : true;
-    const matchesPrice = filters.price !== null ? Number(car.price) <= filters.price : true;
+function buildDealerFilters(filters, dealerId) {
+  const databaseFilters = {
+    dealerId,
+  };
 
-    return matchesBrand && matchesPrice;
-  });
-}
+  if (filters.search) {
+    const searchPattern = new RegExp(escapeRegexValue(filters.search), "i");
 
-function buildDatabaseFilters(filters) {
-  const databaseFilters = {};
-
-  // Brand filter is optional and uses a case-insensitive match.
-  if (filters.brand) {
-    databaseFilters.brand = new RegExp(`^${escapeRegexValue(filters.brand)}$`, "i");
+    databaseFilters.$or = [
+      { title: searchPattern },
+      { brand: searchPattern },
+      { bodyType: searchPattern },
+      { description: searchPattern },
+      { location: searchPattern },
+    ];
   }
 
-  // Price filter is optional and works as "maximum price".
+  if (filters.brand) {
+    databaseFilters.brand = new RegExp(escapeRegexValue(filters.brand), "i");
+  }
+
+  if (filters.fuelType) {
+    databaseFilters.fuelType = new RegExp(`^${escapeRegexValue(filters.fuelType)}$`, "i");
+  }
+
   if (filters.price !== null) {
     databaseFilters.price = { $lte: filters.price };
   }
 
   return databaseFilters;
-}
-
-function validateCarInput(body) {
-  const title = body.title?.trim();
-  const brand = body.brand?.trim();
-  const fuelType = body.fuelType?.trim();
-  const price = Number(body.price);
-  const year = Number(body.year);
-  const kilometersDriven = Number(body.kilometersDriven);
-  const images = Array.isArray(body.images)
-    ? body.images.filter((image) => typeof image === "string" && image.trim())
-    : [];
-
-  if (!title || !brand || !fuelType) {
-    return {
-      error: "title, brand, and fuelType are required.",
-    };
-  }
-
-  // Price, year, and kilometersDriven should be valid numbers before saving.
-  if (
-    Number.isNaN(price) ||
-    price < 0 ||
-    Number.isNaN(year) ||
-    year < 1900 ||
-    Number.isNaN(kilometersDriven) ||
-    kilometersDriven < 0
-  ) {
-    return {
-      error: "price, year, and kilometersDriven must be valid numbers.",
-    };
-  }
-
-  return {
-    data: {
-      title,
-      brand,
-      fuelType,
-      price,
-      year,
-      kilometersDriven,
-      images,
-    },
-  };
 }
 
 export async function GET(request) {
@@ -154,12 +117,7 @@ export async function GET(request) {
 
       await connectToDatabase();
 
-      const databaseFilters = {
-        ...buildDatabaseFilters(filters),
-        dealerId: dealer._id,
-      };
-
-      const cars = await Car.find(databaseFilters).sort({ createdAt: -1 }).lean();
+      const cars = await Car.find(buildDealerFilters(filters, dealer._id)).sort({ createdAt: -1 }).lean();
 
       return NextResponse.json({
         success: true,
@@ -179,27 +137,13 @@ export async function GET(request) {
     }
   }
 
-  // Return sample data first so the UI still works before MongoDB is configured.
-  if (!process.env.MONGODB_URI) {
-    const filteredSampleCars = filterSampleCars(sampleCars, filters);
-
-    return NextResponse.json({
-      success: true,
-      source: "sample",
-      message: "Add MONGODB_URI to start loading cars from MongoDB.",
-      cars: filteredSampleCars,
-    });
-  }
-
   try {
-    await connectToDatabase();
-    const databaseFilters = buildDatabaseFilters(filters);
-    const cars = await Car.find(databaseFilters).sort({ createdAt: -1 }).lean();
+    const { cars, source } = await loadPublicCars(filters);
 
     return NextResponse.json({
       success: true,
-      source: "database",
-      cars: serializeCars(cars),
+      source,
+      cars,
     });
   } catch (error) {
     console.error("GET /api/cars error:", error);
@@ -233,7 +177,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const validationResult = validateCarInput(body);
+    const validationResult = await buildValidatedCarData(body);
 
     if (validationResult.error) {
       return NextResponse.json(
@@ -245,7 +189,6 @@ export async function POST(request) {
       );
     }
 
-    // Use the dealer from the verified JWT instead of trusting dealerId from the client.
     const createdCar = await Car.create({
       ...validationResult.data,
       dealerId: dealer._id,

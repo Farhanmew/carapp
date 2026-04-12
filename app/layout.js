@@ -1,11 +1,6 @@
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
-
-const inter = Inter({
-  subsets: ["latin"],
-});
 
 export const metadata = {
   title: {
@@ -18,7 +13,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} text-[var(--color-text)] antialiased`}>
+      <body className="text-[var(--color-text)] antialiased">
         <div className="flex min-h-screen flex-col">
           <Navbar />
           <main className="flex-1">{children}</main>

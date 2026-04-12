@@ -3,17 +3,57 @@
 import { useEffect, useState } from "react";
 import CarCard from "@/components/CarCard";
 import Card from "@/components/Card";
-import { sampleCars } from "@/data/sampleCars";
 import { getWishlistIds } from "@/lib/wishlist";
 
 export default function WishlistContent() {
+  const [inventory, setInventory] = useState([]);
   const [savedCars, setSavedCars] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInventory() {
+      setInventoryLoading(true);
+
+      try {
+        const response = await fetch("/api/cars", {
+          cache: "no-store",
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || "Could not load the marketplace inventory.");
+        }
+
+        if (isMounted) {
+          setInventory(result.cars || []);
+        }
+      } catch (error) {
+        console.error("Wishlist inventory error:", error);
+
+        if (isMounted) {
+          setInventory([]);
+        }
+      } finally {
+        if (isMounted) {
+          setInventoryLoading(false);
+        }
+      }
+    }
+
+    loadInventory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Rebuild the saved list from localStorage whenever the page loads or the user updates the wishlist.
     const loadSavedCars = () => {
       const wishlistIds = new Set(getWishlistIds());
-      const matchingCars = sampleCars.filter((car) => wishlistIds.has(String(car._id)));
+      const matchingCars = inventory.filter((car) => wishlistIds.has(String(car._id)));
       setSavedCars(matchingCars);
     };
 
@@ -25,7 +65,7 @@ export default function WishlistContent() {
       window.removeEventListener("wishlist-updated", loadSavedCars);
       window.removeEventListener("storage", loadSavedCars);
     };
-  }, []);
+  }, [inventory]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -38,7 +78,11 @@ export default function WishlistContent() {
         </p>
       </Card>
 
-      {savedCars.length === 0 ? (
+      {inventoryLoading ? (
+        <Card className="mt-8 text-center" padding="lg">
+          <h2 className="text-xl font-bold text-slate-900">Loading saved cars...</h2>
+        </Card>
+      ) : savedCars.length === 0 ? (
         <Card className="mt-8 border-dashed text-center" padding="lg">
           <h2 className="text-xl font-bold text-slate-900">No saved cars yet</h2>
           <p className="mt-3 text-sm leading-7 text-[var(--color-text-soft)]">

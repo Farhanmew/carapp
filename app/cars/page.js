@@ -2,11 +2,13 @@ import Button from "@/components/Button";
 import CarCard from "@/components/CarCard";
 import Card from "@/components/Card";
 import InputField from "@/components/InputField";
-import { sampleCars } from "@/data/sampleCars";
+import { getPublicCars } from "@/lib/publicCars";
 
 export const metadata = {
   title: "Cars",
 };
+
+export const dynamic = "force-dynamic";
 
 function getSearchValue(searchParams, key) {
   const value = searchParams?.[key];
@@ -33,25 +35,10 @@ function getCarFilters(searchParams) {
   };
 }
 
-function filterCars(cars, filters) {
-  return cars.filter((car) => {
-    const carBrand = car.brand || car.make || "";
-    const searchableText = `${car.title} ${carBrand} ${car.model || ""} ${car.bodyType || ""}`.toLowerCase();
-    const matchesSearch = filters.search ? searchableText.includes(filters.search.toLowerCase()) : true;
-    const matchesBrand = filters.brand ? carBrand.toLowerCase().includes(filters.brand.toLowerCase()) : true;
-    const matchesFuelType = filters.fuelType
-      ? (car.fuelType || "").toLowerCase() === filters.fuelType.toLowerCase()
-      : true;
-    const matchesPrice = filters.price !== null ? Number(car.price) <= filters.price : true;
-
-    return matchesSearch && matchesBrand && matchesFuelType && matchesPrice;
-  });
-}
-
 export default async function CarsPage({ searchParams }) {
   const resolvedSearchParams = await searchParams;
   const filters = getCarFilters(resolvedSearchParams);
-  const filteredCars = filterCars(sampleCars, filters);
+  const filteredCars = await getPublicCars(filters);
   const hasActiveFilters = Boolean(filters.search || filters.brand || filters.fuelType || filters.price !== null);
 
   return (
@@ -60,9 +47,8 @@ export default async function CarsPage({ searchParams }) {
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-orange-600">Browse listings</p>
         <h1 className="mt-3 text-3xl font-bold text-slate-900 sm:text-4xl">Cars ready to browse</h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-text-soft)]">
-          This page uses local sample data so the interface is ready before you connect a real database. The starter
-          API route at <code className="rounded bg-slate-100 px-2 py-1 text-xs">/api/cars</code> can return sample data
-          first and switch to MongoDB once you add your connection string.
+          Browse the live marketplace inventory. New dealer listings flow into this page automatically after they are
+          published from the dealer dashboard.
         </p>
       </Card>
 

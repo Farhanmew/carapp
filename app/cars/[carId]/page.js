@@ -4,7 +4,9 @@ import Card from "@/components/Card";
 import CarCard from "@/components/CarCard";
 import EnquiryForm from "@/components/EnquiryForm";
 import CarImageGallery from "@/components/CarImageGallery";
-import { sampleCars } from "@/data/sampleCars";
+import { getPublicCarByIdentifier, getRelatedPublicCars } from "@/lib/publicCars";
+
+export const dynamic = "force-dynamic";
 
 function formatPrice(price) {
   return new Intl.NumberFormat("en-US", {
@@ -12,10 +14,6 @@ function formatPrice(price) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(price);
-}
-
-function getCarById(carId) {
-  return sampleCars.find((car) => car.slug === carId || String(car._id) === carId);
 }
 
 function getGalleryImages(car) {
@@ -52,7 +50,7 @@ function getDealerInfo(car) {
 
 export async function generateMetadata({ params }) {
   const resolvedParams = await params;
-  const car = getCarById(resolvedParams.carId);
+  const car = await getPublicCarByIdentifier(resolvedParams.carId);
 
   if (!car) {
     return {
@@ -67,7 +65,7 @@ export async function generateMetadata({ params }) {
 
 export default async function CarDetailsPage({ params }) {
   const resolvedParams = await params;
-  const car = getCarById(resolvedParams.carId);
+  const car = await getPublicCarByIdentifier(resolvedParams.carId);
 
   if (!car) {
     notFound();
@@ -76,7 +74,7 @@ export default async function CarDetailsPage({ params }) {
   const galleryImages = getGalleryImages(car);
   const dealerInfo = getDealerInfo(car);
   const carDetails = getCarDetails(car);
-  const relatedCars = sampleCars.filter((item) => item._id !== car._id).slice(0, 3);
+  const relatedCars = await getRelatedPublicCars(car._id, 3);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">

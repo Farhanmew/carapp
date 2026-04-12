@@ -29,7 +29,7 @@ export async function POST(request) {
 
     await connectToDatabase();
 
-    const dealer = await Dealer.findOne({ email });
+    const dealer = await Dealer.findOne({ email, role: "dealer" });
 
     if (!dealer) {
       return NextResponse.json(

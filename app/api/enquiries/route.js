@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectToDatabase from "@/lib/mongodb";
 import { requireDealerAuth } from "@/lib/dealerMiddleware";
 import Car from "@/models/Car";
@@ -141,6 +142,28 @@ export async function POST(request) {
     }
 
     await connectToDatabase();
+
+    if (!mongoose.Types.ObjectId.isValid(validationResult.data.carId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid car id.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const relatedCar = await Car.findById(validationResult.data.carId).select("_id").lean();
+
+    if (!relatedCar) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "This car could not be found.",
+        },
+        { status: 404 }
+      );
+    }
 
     // Save only the validated fields so the payload stays predictable.
     const enquiry = await Enquiry.create(validationResult.data);

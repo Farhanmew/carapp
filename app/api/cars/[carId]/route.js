@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/mongodb";
+import { buildValidatedCarData } from "@/lib/carUtils";
 import { requireDealerAuth } from "@/lib/dealerMiddleware";
 import Car from "@/models/Car";
+import Enquiry from "@/models/Enquiry";
 
 function formatCarResponse(car) {
   return {
@@ -10,50 +12,6 @@ function formatCarResponse(car) {
     _id: car._id.toString(),
     dealerId: car.dealerId?.toString ? car.dealerId.toString() : car.dealerId,
     createdAt: car.createdAt?.toISOString ? car.createdAt.toISOString() : car.createdAt,
-  };
-}
-
-function validateCarInput(body) {
-  const title = body.title?.trim();
-  const brand = body.brand?.trim();
-  const fuelType = body.fuelType?.trim();
-  const price = Number(body.price);
-  const year = Number(body.year);
-  const kilometersDriven = Number(body.kilometersDriven);
-  const images = Array.isArray(body.images)
-    ? body.images.filter((image) => typeof image === "string" && image.trim())
-    : [];
-
-  if (!title || !brand || !fuelType) {
-    return {
-      error: "title, brand, and fuelType are required.",
-    };
-  }
-
-  // Validate the numeric fields before saving the updated car.
-  if (
-    Number.isNaN(price) ||
-    price < 0 ||
-    Number.isNaN(year) ||
-    year < 1900 ||
-    Number.isNaN(kilometersDriven) ||
-    kilometersDriven < 0
-  ) {
-    return {
-      error: "price, year, and kilometersDriven must be valid numbers.",
-    };
-  }
-
-  return {
-    data: {
-      title,
-      brand,
-      fuelType,
-      price,
-      year,
-      kilometersDriven,
-      images,
-    },
   };
 }
 
@@ -97,7 +55,7 @@ export async function PATCH(request, { params }) {
     }
 
     const body = await request.json();
-    const validationResult = validateCarInput(body);
+    const validationResult = await buildValidatedCarData(body, resolvedParams.carId);
 
     if (validationResult.error) {
       return NextResponse.json(
@@ -111,7 +69,6 @@ export async function PATCH(request, { params }) {
 
     await connectToDatabase();
 
-    // Update only the car that belongs to the logged-in dealer.
     const updatedCar = await Car.findOneAndUpdate(
       {
         _id: resolvedParams.carId,
@@ -179,7 +136,6 @@ export async function DELETE(request, { params }) {
 
     await connectToDatabase();
 
-    // Delete only the car that belongs to the logged-in dealer.
     const deletedCar = await Car.findOneAndDelete({
       _id: resolvedParams.carId,
       dealerId: dealer._id,
@@ -194,6 +150,8 @@ export async function DELETE(request, { params }) {
         { status: 404 }
       );
     }
+
+    await Enquiry.deleteMany({ carId: resolvedParams.carId });
 
     return NextResponse.json({
       success: true,

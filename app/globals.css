@@ -26,6 +26,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
   background-color: var(--color-background);
   background:
     radial-gradient(circle at top center, rgba(37, 99, 235, 0.14), transparent 28%),

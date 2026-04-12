@@ -2,7 +2,9 @@ import Button from "@/components/Button";
 import CarCard from "@/components/CarCard";
 import Card from "@/components/Card";
 import InputField from "@/components/InputField";
-import { sampleCars } from "@/data/sampleCars";
+import { getPublicCars } from "@/lib/publicCars";
+
+export const dynamic = "force-dynamic";
 
 const featureCards = [
   {
@@ -19,8 +21,12 @@ const featureCards = [
   },
 ];
 
-export default function HomePage() {
-  const featuredCars = sampleCars.filter((car) => car.featured).slice(0, 3);
+export default async function HomePage() {
+  const latestCars = await getPublicCars();
+  const featuredCars = latestCars.slice(0, 3).map((car) => ({
+    ...car,
+    featured: true,
+  }));
 
   return (
     <div className="w-full px-4 py-8 sm:px-5 lg:px-6">
@@ -141,24 +147,33 @@ export default function HomePage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[var(--color-brand)]">
-                Featured inventory
+                Live inventory
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                Curated listings with a high-trust presentation
+                Newly listed cars from active dealers
               </h2>
             </div>
             <p className="max-w-xl text-sm leading-7 text-[var(--color-text-soft)]">
-              Premium buyers notice polish immediately. A cleaner layout, stronger spacing, and consistent details make
-              every listing feel more credible.
+              The homepage now reflects live marketplace inventory, so fresh dealer listings surface here as soon as
+              they are published.
             </p>
           </div>
 
           {/* Use a lighter section background so the cards sit on their own visual layer. */}
-          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {featuredCars.map((car) => (
-              <CarCard key={car._id} car={car} />
-            ))}
-          </div>
+          {featuredCars.length > 0 ? (
+            <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {featuredCars.map((car) => (
+                <CarCard key={car._id} car={car} />
+              ))}
+            </div>
+          ) : (
+            <Card className="mt-8 border-dashed text-center" padding="lg">
+              <h3 className="text-xl font-semibold tracking-tight text-slate-950">No live listings yet</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--color-text-soft)]">
+                Dealer inventory will appear here once the first listing is published.
+              </p>
+            </Card>
+          )}
         </div>
       </section>
 

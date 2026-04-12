@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CarFront, FileText, LogOut, MessageSquare, Pencil, Plus, Trash2, UserRound } from "lucide-react";
+import { CarFront, FileText, ImageUp, LogOut, MessageSquare, Pencil, Plus, Trash2, UserRound, X } from "lucide-react";
 import Button from "@/components/Button";
 import Card from "@/components/Card";
 import InputField from "@/components/InputField";
@@ -13,7 +13,11 @@ const emptyCarForm = {
   fuelType: "",
   year: "",
   kilometersDriven: "",
-  imagesText: "",
+  location: "",
+  bodyType: "",
+  transmission: "",
+  description: "",
+  images: [],
 };
 
 const emptyAuthForm = {
@@ -43,13 +47,6 @@ function formatDate(dateValue) {
   });
 }
 
-function buildImageArray(imagesText) {
-  return imagesText
-    .split(",")
-    .map((image) => image.trim())
-    .filter(Boolean);
-}
-
 function getCarFormFromCar(car) {
   return {
     title: car.title || "",
@@ -58,7 +55,11 @@ function getCarFormFromCar(car) {
     fuelType: car.fuelType || "",
     year: car.year?.toString() || "",
     kilometersDriven: car.kilometersDriven?.toString() || "",
-    imagesText: Array.isArray(car.images) ? car.images.join(", ") : "",
+    location: car.location || "",
+    bodyType: car.bodyType || "",
+    transmission: car.transmission || "",
+    description: car.description || "",
+    images: Array.isArray(car.images) ? car.images.filter(Boolean) : [],
   };
 }
 
@@ -91,6 +92,68 @@ function StatCard({ icon: Icon, label, value }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+function UploadedImagesField({ images, uploadingImages, onUpload, onRemoveImage }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <label htmlFor="car-images" className="block text-sm font-semibold text-slate-800">
+            Car images
+          </label>
+          <p className="mt-1 text-xs leading-6 text-[var(--color-text-soft)]">
+            Upload up to 8 images. JPG, PNG, WEBP, and GIF are supported.
+          </p>
+        </div>
+
+        <label
+          htmlFor="car-images"
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-300 ${
+            uploadingImages
+              ? "pointer-events-none border-slate-200 bg-slate-100 text-slate-400"
+              : "border-[var(--color-line-strong)] bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50"
+          }`}
+        >
+          <ImageUp className="h-4 w-4" />
+          {uploadingImages ? "Uploading..." : "Upload images"}
+        </label>
+      </div>
+
+      <input
+        id="car-images"
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={onUpload}
+        className="hidden"
+      />
+
+      {images.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {images.map((imageUrl, index) => (
+            <div key={`${imageUrl}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+              <div className="relative aspect-[4/3] bg-slate-100">
+                <img src={imageUrl} alt={`Uploaded car image ${index + 1}`} className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => onRemoveImage(imageUrl)}
+                  aria-label={`Remove image ${index + 1}`}
+                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/75 text-white transition hover:bg-slate-950"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-6 text-sm text-[var(--color-text-soft)]">
+          Upload images and the first one will be used as the listing cover image.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -321,6 +384,7 @@ export default function DealerDashboardContent() {
   const [pageLoading, setPageLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [carSaving, setCarSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState("success");
   const [authMode, setAuthMode] = useState("login");
@@ -416,6 +480,61 @@ export default function DealerDashboardContent() {
     setCarForm((currentForm) => ({
       ...currentForm,
       [name]: value,
+    }));
+  }
+
+  async function handleImageUpload(event) {
+    const selectedFiles = Array.from(event.target.files || []);
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    if (carForm.images.length + selectedFiles.length > 8) {
+      showFeedback("error", "A listing can include up to 8 images.");
+      event.target.value = "";
+      return;
+    }
+
+    setImageUploading(true);
+    showFeedback("success", "");
+
+    try {
+      const formData = new FormData();
+
+      selectedFiles.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        showFeedback("error", result.message || "Could not upload the selected images.");
+        return;
+      }
+
+      setCarForm((currentForm) => ({
+        ...currentForm,
+        images: [...currentForm.images, ...(result.urls || [])].slice(0, 8),
+      }));
+      showFeedback("success", result.message || "Images uploaded successfully.");
+    } catch (error) {
+      console.error("Dealer image upload error:", error);
+      showFeedback("error", "Something went wrong while uploading the images.");
+    } finally {
+      event.target.value = "";
+      setImageUploading(false);
+    }
+  }
+
+  function handleRemoveImage(imageUrl) {
+    setCarForm((currentForm) => ({
+      ...currentForm,
+      images: currentForm.images.filter((savedImageUrl) => savedImageUrl !== imageUrl),
     }));
   }
 
@@ -539,7 +658,11 @@ export default function DealerDashboardContent() {
           fuelType: carForm.fuelType,
           year: carForm.year,
           kilometersDriven: carForm.kilometersDriven,
-          images: buildImageArray(carForm.imagesText),
+          location: carForm.location,
+          bodyType: carForm.bodyType,
+          transmission: carForm.transmission,
+          description: carForm.description,
+          images: carForm.images,
         }),
       });
 
@@ -708,29 +831,60 @@ export default function DealerDashboardContent() {
               />
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-3">
+              <InputField
+                label="Location"
+                name="location"
+                placeholder="Bangalore"
+                value={carForm.location}
+                onChange={handleCarInputChange}
+              />
+              <InputField
+                label="Body type"
+                name="bodyType"
+                placeholder="SUV"
+                value={carForm.bodyType}
+                onChange={handleCarInputChange}
+              />
+              <InputField
+                label="Transmission"
+                name="transmission"
+                placeholder="Automatic"
+                value={carForm.transmission}
+                onChange={handleCarInputChange}
+              />
+            </div>
+
             <div className="space-y-2">
-              <label htmlFor="imagesText" className="block text-sm font-semibold text-slate-800">
-                Image URLs
+              <label htmlFor="description" className="block text-sm font-semibold text-slate-800">
+                Description
               </label>
 
               <textarea
-                id="imagesText"
-                name="imagesText"
-                rows={4}
-                placeholder="Add one or more image URLs separated by commas"
-                value={carForm.imagesText}
+                id="description"
+                name="description"
+                rows={5}
+                placeholder="Add the highlights buyers should know about this car."
+                value={carForm.description}
                 onChange={handleCarInputChange}
                 className="w-full rounded-2xl border border-[var(--color-line-strong)] bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-4 focus:ring-blue-100"
               />
-
-              <p className="text-xs leading-6 text-[var(--color-text-soft)]">
-                Keep it simple: paste full image links separated by commas.
-              </p>
             </div>
 
-            <Button type="submit" fullWidth className={carSaving ? "pointer-events-none opacity-70" : ""}>
+            <UploadedImagesField
+              images={carForm.images}
+              uploadingImages={imageUploading}
+              onUpload={handleImageUpload}
+              onRemoveImage={handleRemoveImage}
+            />
+
+            <Button
+              type="submit"
+              fullWidth
+              className={carSaving || imageUploading ? "pointer-events-none opacity-70" : ""}
+            >
               <Plus className="h-4 w-4" />
-              {carSaving ? "Saving car..." : editingCarId ? "Update car" : "Add car"}
+              {carSaving ? "Saving car..." : imageUploading ? "Uploading images..." : editingCarId ? "Update car" : "Add car"}
             </Button>
           </form>
         </Card>

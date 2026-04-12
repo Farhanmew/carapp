@@ -1,6 +1,15 @@
 import mongoose from "mongoose";
 
 const carSchema = new mongoose.Schema({
+  // Human-friendly URL slug generated from the title.
+  slug: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    unique: true,
+    sparse: true,
+  },
+
   // Main car title shown on the listing.
   title: {
     type: String,
@@ -27,6 +36,34 @@ const carSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
+  },
+
+  // City or region shown in the public listing card.
+  location: {
+    type: String,
+    trim: true,
+    default: "",
+  },
+
+  // Optional body style used in the public-facing UI.
+  bodyType: {
+    type: String,
+    trim: true,
+    default: "",
+  },
+
+  // Optional gearbox/transmission value shown on the details page.
+  transmission: {
+    type: String,
+    trim: true,
+    default: "",
+  },
+
+  // Dealer-provided description shown on listing and details pages.
+  description: {
+    type: String,
+    trim: true,
+    default: "",
   },
 
   // Manufacturing year of the car.
